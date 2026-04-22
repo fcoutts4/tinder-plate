@@ -1,0 +1,17 @@
+{
+  "name": "futbol-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "vercel dev",
+    "seed": "node --env-file=.env.local scripts/seed.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
+  },
+  "devDependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

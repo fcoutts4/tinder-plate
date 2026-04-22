@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node build.js)",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\claude-cli-nodejs\\\\\" | Select-Object -First 10)"
+    ]
+  }
+}
