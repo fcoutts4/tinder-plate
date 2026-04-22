@@ -1,6 +1,6 @@
 # Fútbol Manager
 
-App de gestión de equipos de fútbol: partidos, jugadores, asistencia, estadísticas y planilla táctica.
+App de gestión de equipos de fútbol:
 
 ## Stack
 
