@@ -179,3 +179,12 @@ replace(
 mkdirSync(join(__dirname, 'public'), { recursive: true });
 writeFileSync(join(__dirname, 'public', 'index.html'), html, 'utf8');
 console.log('\n\u2705  public/index.html built successfully');
+
+// Seed database during Vercel deploy (skipped if DB already has data)
+if (process.env.DATABASE_URL) {
+  console.log('\nSynchronizing database...');
+  const { main: seedMain } = await import('./scripts/seed.mjs');
+  await seedMain();
+} else {
+  console.log('\n\u26a0\ufe0f  DATABASE_URL not set \u2014 skipping seed (set it in Vercel environment variables)');
+}

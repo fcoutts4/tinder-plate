@@ -9,9 +9,7 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
-  },
-  "devDependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "xlsx": "^0.18.5"
   }
 }

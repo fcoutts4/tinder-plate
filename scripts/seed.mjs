@@ -208,10 +208,20 @@ async function seedAsistencia(ws) {
 }
 
 // ── Main ───────────────────────────────────────────────────
-async function main() {
+export async function main() {
   if (!process.env.DATABASE_URL) {
-    console.error('❌  DATABASE_URL not set. Run: node --env-file=.env.local scripts/seed.mjs');
+    console.error('❌  DATABASE_URL not set.');
     process.exit(1);
+  }
+
+  // Always ensure tables exist
+  await createTables();
+
+  // Skip Excel import if DB already has data (idempotent deploys)
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM jugadores`;
+  if (rows[0].count > 0) {
+    console.log(`✓ DB already has data (${rows[0].count} jugadores). Skipping Excel import.`);
+    return;
   }
 
   console.log('Reading Excel file:', XLSX_PATH);
@@ -219,16 +229,13 @@ async function main() {
   try {
     wb = xlsx.readFile(XLSX_PATH, { cellDates: true, defval: '' });
   } catch (e) {
-    console.error('❌  Cannot read Excel file:', e.message);
-    process.exit(1);
+    console.warn('⚠️  Cannot read Excel file:', e.message, '— starting with empty DB.');
+    return;
   }
 
   const sheetNames = wb.SheetNames;
   console.log('Sheets found:', sheetNames.join(', '));
 
-  await createTables();
-
-  // Seed each sheet if it exists (case-insensitive match)
   function findSheet(candidates) {
     for (const name of candidates) {
       const found = sheetNames.find(s => s.toLowerCase() === name.toLowerCase());
@@ -255,4 +262,8 @@ async function main() {
   console.log('\n✅  Seed complete!');
 }
 
-main().catch(e => { console.error('❌  Seed failed:', e); process.exit(1); });
+// Run directly (node --env-file=.env.local scripts/seed.mjs)
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch(e => { console.error('❌  Seed failed:', e); process.exit(1); });
+}
