@@ -168,7 +168,7 @@ async function seedJugadores(ws) {
     if (!id || !nombre) continue;
     const dorsal = normInt(row['Dorsal'] || row['dorsal'] || 0);
     const posicion = norm(row['Posición'] || row['Posicion'] || row['posicion'] || row['Posición'] || '');
-    const activo = normBool(row['Activo'] || row['activo'] ?? true);
+    const activo = normBool(row['Activo'] ?? row['activo'] ?? true);
     await sql`
       INSERT INTO jugadores (id, nombre, dorsal, posicion, activo)
       VALUES (${id}, ${nombre}, ${dorsal}, ${posicion}, ${activo})
