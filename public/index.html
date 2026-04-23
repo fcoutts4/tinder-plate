@@ -340,6 +340,19 @@ button{cursor:pointer}
 .color-opt.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--text)}
 .color-opt.selected::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
+/* ── Stats avanzados ──────────────────────────── */
+.forma-wrap{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.forma-sq{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.forma-sq.w{background:var(--green)}
+.forma-sq.e{background:var(--yellow)}
+.forma-sq.l{background:var(--red)}
+.racha-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.racha-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center;box-shadow:var(--shadow)}
+.racha-val{font-family:'Bebas Neue',cursive;font-size:28px;line-height:1;color:var(--green)}
+.racha-val.red{color:var(--red)}
+.racha-val.yellow{color:var(--yellow)}
+.racha-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:3px}
+
 /* ── Modalidad toggle ─────────────────────────── */
 .modalidad-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden}
 .modalidad-btn{flex:1;padding:10px;font-size:13px;font-weight:700;border:none;background:var(--bg);color:var(--muted);cursor:pointer;transition:all .2s}
@@ -753,6 +766,7 @@ button{cursor:pointer}
           <button onclick="descargarGoleadoresPNG()" class="btn btn-red btn-block" id="btnGoleadores">Descargar goleadores</button>
         </div>
         <div id="statsSummary" class="stats-summary"></div>
+        <div id="statsFormaRachas" style="margin-bottom:12px"></div>
         <div id="statsContent"><div class="loader"><div class="spinner"></div>Calculando…</div></div>
       </div>
       <!-- Detalle jugador (oculto) -->
@@ -855,6 +869,39 @@ button{cursor:pointer}
           </p>
         </div>
       </div>
+      <div style="height:12px"></div>
+
+      <!-- Cambiar clave de edición -->
+      <div class="card" id="cardSeguridad">
+        <div class="card-header">🔐 Seguridad</div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Nueva clave de edición</label>
+            <input class="form-input" type="password" id="cfgNuevaClave" placeholder="Nueva clave">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmar nueva clave</label>
+            <input class="form-input" type="password" id="cfgNuevaClave2" placeholder="Repetir nueva clave">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="cambiarClaveEquipo()">Cambiar clave</button>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <!-- Zona peligrosa -->
+      <div class="card" style="border-color:#fca5a5">
+        <div class="card-header" style="background:#fff1f2;color:#dc2626;border-color:#fca5a5">⚠️ Zona peligrosa</div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+            Eliminar el equipo borra <strong>todos los datos</strong>: jugadores, partidos, campeonatos y asistencia. Esta acción es irreversible.
+          </p>
+          <button class="btn btn-danger btn-block" onclick="confirmarEliminarEquipo()" style="background:#fff5f5;color:#dc2626;border:1.5px solid #dc2626">
+            Eliminar este equipo
+          </button>
+        </div>
+      </div>
+
       <div style="height:12px"></div>
       <div class="card">
         <div class="card-header">⚙️ Sistema</div>
@@ -1271,6 +1318,42 @@ button{cursor:pointer}
       <button class="btn btn-outline btn-block" onclick="showCrearEquipoModal()" style="font-size:14px">
         + Crear equipo nuevo
       </button>
+    </div>
+
+    <!-- Panel admin (colapsado por defecto) -->
+    <div style="margin-top:32px;border-top:1px solid var(--border);padding-top:20px">
+      <div id="adminPanelBtn" style="text-align:center">
+        <button onclick="mostrarPanelAdmin()" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline">
+          🔑 Administrar equipos
+        </button>
+      </div>
+      <div id="adminPanelBox" style="display:none">
+        <div class="form-group">
+          <label class="form-label" style="margin-top:8px">Clave de administrador</label>
+          <input class="form-input" type="password" id="adminPanelKey" placeholder="Admin key">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="cargarPanelAdmin()">Ver panel admin</button>
+        <div id="adminPanelContent" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ELIMINAR EQUIPO ═══════════════════════ -->
+<div class="modal-overlay" id="modalEliminarEquipo">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:#dc2626">⚠️ Eliminar equipo</div>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:16px;line-height:1.5">
+      Esta acción es <strong>permanente e irreversible</strong>. Se borrarán todos los jugadores, partidos, campeonatos y asistencia del equipo.
+    </p>
+    <div class="form-group">
+      <label class="form-label">Clave de administrador</label>
+      <input class="form-input" type="password" id="elimEqAdminKey" placeholder="Ingresá la clave de admin para confirmar">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modalEliminarEquipo')">Cancelar</button>
+      <button class="btn btn-danger" style="flex:2;background:#dc2626;color:#fff;border-color:#dc2626" onclick="ejecutarEliminarEquipo()">Eliminar definitivamente</button>
     </div>
   </div>
 </div>
@@ -3165,6 +3248,7 @@ function loadStats(force) {
   }
   STATE.statsLoadedOnce = true;
   if(STATE.stats.campList) populateFilterDropdowns(STATE.stats.campList, STATE.stats.yearList);
+  renderFormaYRachas(filtros);
   renderStatsTable();
 }
 
@@ -3213,6 +3297,101 @@ function sortStats(col) {
     STATE.statsSortDir = col === 'Nombre' ? 'asc' : 'desc';
   }
   renderStatsTable();
+}
+
+// ══════════════════════════════════════════════════
+//  STATS AVANZADOS — Forma reciente + Rachas
+// ══════════════════════════════════════════════════
+function renderFormaYRachas(filtros) {
+  const el = document.getElementById('statsFormaRachas');
+  if (!el) return;
+
+  // Obtener partidos filtrados (mismo filtro que las stats)
+  let partidos = [...(STATE.partidos || [])].filter(p => !p.Amistoso);
+
+  const idCamp = filtros?.idCampeonato || null;
+  const año    = filtros?.año ? String(filtros.año) : null;
+  const tipo   = filtros?.tipo || null;
+
+  if (idCamp) partidos = partidos.filter(p => String(p.ID_Campeonato) === idCamp);
+  if (año)    partidos = partidos.filter(p => p.Fecha && String(new Date(p.Fecha+'T12:00:00').getFullYear()) === año);
+  if (tipo === 'amistosos') partidos = (STATE.partidos||[]).filter(p => p.Amistoso);
+  else if (tipo === 'oficiales') partidos = partidos; // ya filtró amistosos
+
+  // Ordenar por fecha ascendente para rachas
+  const sorted = [...partidos].sort((a,b) => (a.Fecha||'').localeCompare(b.Fecha||''));
+
+  if (!sorted.length) { el.innerHTML = ''; return; }
+
+  // Clasificar resultados
+  const resultados = sorted.map(p => {
+    const gf = Number(p.GF)||0, gc = Number(p.GC)||0;
+    return gf > gc ? 'w' : gf === gc ? 'e' : 'l';
+  });
+
+  // Racha actual
+  const last = resultados[resultados.length-1];
+  let rachaActual = 0, rachaActualTipo = last;
+  for (let i = resultados.length-1; i >= 0; i--) {
+    if (resultados[i] === last) rachaActual++;
+    else break;
+  }
+
+  // Mejor racha invicto (W o E)
+  let mejorInvicto = 0, curInvicto = 0;
+  resultados.forEach(r => {
+    if (r !== 'l') { curInvicto++; mejorInvicto = Math.max(mejorInvicto, curInvicto); }
+    else curInvicto = 0;
+  });
+
+  // Mejor racha ganando
+  let mejorGanando = 0, curGanando = 0;
+  resultados.forEach(r => {
+    if (r === 'w') { curGanando++; mejorGanando = Math.max(mejorGanando, curGanando); }
+    else curGanando = 0;
+  });
+
+  // Forma (últimos 15)
+  const ultimos = resultados.slice(-15);
+  const labelRes = { w:'G', e:'E', l:'P' };
+
+  const rachaColor = rachaActualTipo === 'w' ? '' : rachaActualTipo === 'e' ? ' yellow' : ' red';
+  const rachaLabel = rachaActualTipo === 'w' ? 'Racha ganando' : rachaActualTipo === 'e' ? 'Racha empatando' : 'Racha perdiendo';
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-header">📈 Forma reciente</div>
+      <div class="card-body" style="padding-bottom:10px">
+        <div class="forma-wrap">
+          ${ultimos.map(r => `<div class="forma-sq ${r}" title="${labelRes[r]}">${labelRes[r]}</div>`).join('')}
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px">Últimos ${ultimos.length} partidos (más reciente a la derecha)</p>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-header">🔥 Rachas</div>
+      <div class="card-body" style="padding-bottom:10px">
+        <div class="racha-grid">
+          <div class="racha-item">
+            <div class="racha-val${rachaColor}">${rachaActual}</div>
+            <div class="racha-lbl">${rachaLabel}</div>
+          </div>
+          <div class="racha-item">
+            <div class="racha-val">${mejorInvicto}</div>
+            <div class="racha-lbl">Mejor racha invicto</div>
+          </div>
+          <div class="racha-item">
+            <div class="racha-val">${mejorGanando}</div>
+            <div class="racha-lbl">Mejor racha ganando</div>
+          </div>
+          <div class="racha-item">
+            <div class="racha-val yellow">${sorted.filter(p=>Number(p.GF)>Number(p.GC)).length}</div>
+            <div class="racha-lbl">Victorias totales</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderStatsTable() {
@@ -3698,6 +3877,57 @@ function removeLogo() {
 // ══════════════════════════════════════════════════
 //  COLOR THEME
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  SEGURIDAD — cambiar clave / eliminar equipo
+// ══════════════════════════════════════════════════
+function cambiarClaveEquipo() {
+  if (!ensureAdmin()) return;
+  const nueva  = (document.getElementById('cfgNuevaClave')?.value  || '').trim();
+  const nueva2 = (document.getElementById('cfgNuevaClave2')?.value || '').trim();
+  if (!nueva)          { toast('Ingresá la nueva clave', true); return; }
+  if (nueva !== nueva2){ toast('Las claves no coinciden', true); return; }
+
+  call('cambiarClave', { nuevaClave: nueva }, r => {
+    if (r && r.ok) {
+      document.getElementById('cfgNuevaClave').value  = '';
+      document.getElementById('cfgNuevaClave2').value = '';
+      // Forzar re-login para que el usuario ingrese la nueva clave
+      const ROLE_KEY = 'fm_role_' + (STATE.equipo?.slug || '');
+      localStorage.removeItem(ROLE_KEY);
+      toast('Clave cambiada. Volvé a ingresar con la nueva clave.');
+      setTimeout(() => openRoleGate(), 1500);
+    } else {
+      toast(r?.error || 'Error al cambiar clave', true);
+    }
+  });
+}
+
+function confirmarEliminarEquipo() {
+  if (!ensureAdmin()) return;
+  const el = document.getElementById('elimEqAdminKey');
+  if (el) el.value = '';
+  openModal('modalEliminarEquipo');
+}
+
+function ejecutarEliminarEquipo() {
+  const adminKey = (document.getElementById('elimEqAdminKey')?.value || '').trim();
+  if (!adminKey) { toast('Ingresá la clave de administrador', true); return; }
+
+  const btn = document.querySelector('#modalEliminarEquipo .btn-danger');
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminando…'; }
+
+  call('eliminarEquipo', { adminKey }, r => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Eliminar definitivamente'; }
+    if (r && r.ok) {
+      closeModal('modalEliminarEquipo');
+      toast('Equipo eliminado.');
+      setTimeout(() => { window.location.href = '/'; }, 1200);
+    } else {
+      toast(r?.error || 'Error al eliminar', true);
+    }
+  });
+}
+
 function pickColor(btn) {
   const color = btn.dataset.color;
   STATE.config.color = color;
@@ -4799,7 +5029,6 @@ function descargarGoleadoresPNG() {
     <div class="pl2-card" style="margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong>Jugadores disponibles (activos)</strong>
-        <button id="pl2Reload" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px">↻ Recargar</button>
       </div>
       <div id="pl2Pool" class="pl2-pool" style="display:flex;flex-wrap:wrap;gap:6px;min-height:52px"></div>
     </div>
@@ -4863,7 +5092,6 @@ function descargarGoleadoresPNG() {
   .viewer-mode #page-planilla .pl2-title,
   .viewer-mode #page-planilla .pl2-select,
   .viewer-mode #page-planilla #pl2ApplyFormation,
-  .viewer-mode #page-planilla #pl2Reload,
   .viewer-mode #page-planilla #pl2Clear,
   .viewer-mode #page-planilla #pl2ActionSwap,
   .viewer-mode #page-planilla #pl2ActionCaptain,
@@ -4923,6 +5151,15 @@ function descargarGoleadoresPNG() {
 
   var STORAGE_KEY='tinder_planilla_v2';
   var SAVE_DEBOUNCE=800;
+
+  // Clave de localStorage con scope por equipo para evitar mezcla entre equipos
+  function getStorageKey(){
+    try{
+      var slug=window.STATE&&window.STATE.equipo&&window.STATE.equipo.slug
+        ? window.STATE.equipo.slug : 'default';
+      return STORAGE_KEY+'_'+slug;
+    }catch(e){ return STORAGE_KEY; }
+  }
   var HTML2CANVAS_CDN='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
 
   // Fútbol 7 formations (6 outfield spots)
@@ -5107,7 +5344,7 @@ function descargarGoleadoresPNG() {
 
   function saveLocal(){
     state.updatedAt=Date.now();
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}
+    try{localStorage.setItem(getStorageKey(),JSON.stringify(state));}catch(e){}
   }
 
   function saveRemote(){
@@ -5129,7 +5366,7 @@ function descargarGoleadoresPNG() {
 
   function loadLocal(){
     try{
-      var raw=localStorage.getItem(STORAGE_KEY);
+      var raw=localStorage.getItem(getStorageKey());
       if(raw){
         var s=JSON.parse(raw);
         if(s && typeof s==='object') return s;
@@ -5891,7 +6128,7 @@ function descargarGoleadoresPNG() {
       closePlayerActions();
     });
 
-    $('pl2Reload').addEventListener('click',function(){ if(!ensureAdmin()) return; bootData(true); });
+    // pl2Reload button removed — planilla loads automatically on every navigation
     $('pl2Export').addEventListener('click',function(){exportPNG(false);});
     $('pl2Share').addEventListener('click',function(){exportPNG(true);});
     $('pl2Copy').addEventListener('click',copyList);
@@ -5968,7 +6205,7 @@ function descargarGoleadoresPNG() {
           _out=prev.call(this,'planilla');
           init();
         }
-        requestAnimationFrame(function(){ if(typeof bootData==='function') bootData(true); setTimeout(function(){ if(typeof renderAll==='function') renderAll(); },3000); });
+        requestAnimationFrame(function(){ if(typeof bootData==='function') bootData(true); });
         return _out;
       }
       return typeof prev==='function' ? prev.apply(this,arguments) : undefined;
@@ -6140,6 +6377,70 @@ function submitCrearEquipo() {
     if (btn) { btn.disabled = false; btn.textContent = 'Crear equipo'; }
     toast('Error de conexión', true);
   });
+}
+
+// ── Panel admin en el selector ──────────────────────────
+function mostrarPanelAdmin() {
+  document.getElementById('adminPanelBtn').style.display = 'none';
+  document.getElementById('adminPanelBox').style.display = '';
+}
+
+function cargarPanelAdmin() {
+  const adminKey = (document.getElementById('adminPanelKey')?.value || '').trim();
+  if (!adminKey) { alert('Ingresá la clave de administrador'); return; }
+
+  const content = document.getElementById('adminPanelContent');
+  content.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:13px">Cargando…</p>';
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'getEquipos' })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (!r || !r.ok || !r.equipos) {
+      content.innerHTML = '<p style="color:red;font-size:13px">Error al cargar equipos</p>'; return;
+    }
+    const equipos = r.equipos;
+    if (!equipos.length) {
+      content.innerHTML = '<p style="color:var(--muted);font-size:13px">No hay equipos registrados.</p>'; return;
+    }
+    content.innerHTML = equipos.map(eq => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="width:12px;height:12px;border-radius:50%;background:${eq.color||'#16a34a'};flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${eq.nombre}</div>
+          <div style="font-size:11px;color:var(--muted)">/${eq.slug}</div>
+        </div>
+        <a href="/${eq.slug}" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:700">Ver →</a>
+        <button onclick="adminEliminarEquipo('${eq.id}','${eq.nombre}','${adminKey}')"
+                style="background:none;border:1px solid #dc2626;border-radius:6px;color:#dc2626;font-size:11px;padding:4px 8px;cursor:pointer">
+          Eliminar
+        </button>
+      </div>
+    `).join('');
+  })
+  .catch(() => { content.innerHTML = '<p style="color:red;font-size:13px">Error de conexión</p>'; });
+}
+
+function adminEliminarEquipo(equipoId, nombre, adminKey) {
+  if (!confirm(`¿Eliminar el equipo "${nombre}" y TODOS sus datos? Esta acción es irreversible.`)) return;
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'eliminarEquipo', payload: { equipoId, adminKey } })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (r && r.ok) {
+      alert(`Equipo "${nombre}" eliminado.`);
+      cargarPanelAdmin(); // refresca la lista
+    } else {
+      alert(r?.error || 'Error al eliminar');
+    }
+  })
+  .catch(() => alert('Error de conexión'));
 }
 </script>
 
