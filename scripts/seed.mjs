@@ -7,6 +7,22 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { neon } from '@neondatabase/serverless';
 import xlsx from 'xlsx';
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
+
+function generateId() {
+  return randomUUID().substring(0, 8).toUpperCase();
+}
+
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 40) || 'equipo';
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const XLSX_PATH = join(__dirname, '..', 'Tinder Plate.xlsx');
@@ -57,23 +73,40 @@ function sheetToObjects(ws) {
 // ── Create tables ──────────────────────────────────────────
 async function createTables() {
   console.log('Creating tables...');
+
+  // Tabla maestra de equipos
+  await sql`
+    CREATE TABLE IF NOT EXISTS equipos (
+      id                TEXT PRIMARY KEY,
+      slug              TEXT UNIQUE NOT NULL,
+      nombre            TEXT NOT NULL DEFAULT 'Mi Equipo',
+      password_hash     TEXT NOT NULL DEFAULT '',
+      color             TEXT DEFAULT '#16a34a',
+      logo              TEXT DEFAULT '',
+      liga              TEXT DEFAULT '',
+      planilla_v2       TEXT DEFAULT '',
+      modalidad         TEXT DEFAULT '11',
+      jugadores_por_lado INTEGER DEFAULT 11,
+      activo            BOOLEAN DEFAULT true
+    )`;
+
   await sql`CREATE TABLE IF NOT EXISTS config (clave TEXT PRIMARY KEY, valor TEXT)`;
   await sql`
     CREATE TABLE IF NOT EXISTS campeonatos (
       id TEXT PRIMARY KEY, nombre TEXT NOT NULL,
-      ano TEXT, temporada TEXT, tipo TEXT DEFAULT 'Liga'
+      ano TEXT, temporada TEXT, tipo TEXT DEFAULT 'Liga', equipo_id TEXT
     )`;
   await sql`
     CREATE TABLE IF NOT EXISTS partidos (
       id TEXT PRIMARY KEY, id_campeonato TEXT,
       fecha DATE, rival TEXT, cancha TEXT, ronda TEXT,
       gf INTEGER DEFAULT 0, gc INTEGER DEFAULT 0,
-      notas TEXT, amistoso BOOLEAN DEFAULT false
+      notas TEXT, amistoso BOOLEAN DEFAULT false, equipo_id TEXT
     )`;
   await sql`
     CREATE TABLE IF NOT EXISTS jugadores (
       id TEXT PRIMARY KEY, nombre TEXT NOT NULL,
-      dorsal INTEGER DEFAULT 0, posicion TEXT, activo BOOLEAN DEFAULT true
+      dorsal INTEGER DEFAULT 0, posicion TEXT, activo BOOLEAN DEFAULT true, equipo_id TEXT
     )`;
   await sql`
     CREATE TABLE IF NOT EXISTS asistencia (
@@ -81,12 +114,41 @@ async function createTables() {
       nombre_jugador TEXT, presente BOOLEAN DEFAULT false,
       goles INTEGER DEFAULT 0, asistencias INTEGER DEFAULT 0,
       amarillas INTEGER DEFAULT 0, rojas INTEGER DEFAULT 0,
+      equipo_id TEXT,
       PRIMARY KEY (id_partido, id_jugador)
     )`;
-  await sql`
-    INSERT INTO config (clave, valor) VALUES
-      ('nombre','Mi Equipo'),('liga',''),('logo',''),('color','#16a34a')
-    ON CONFLICT (clave) DO NOTHING`;
+
+  // Migración idempotente para DBs existentes
+  await sql`ALTER TABLE campeonatos ADD COLUMN IF NOT EXISTS equipo_id TEXT`;
+  await sql`ALTER TABLE partidos    ADD COLUMN IF NOT EXISTS equipo_id TEXT`;
+  await sql`ALTER TABLE jugadores   ADD COLUMN IF NOT EXISTS equipo_id TEXT`;
+  await sql`ALTER TABLE asistencia  ADD COLUMN IF NOT EXISTS equipo_id TEXT`;
+
+  // Crear equipo por defecto desde config legacy si no existe ninguno
+  const eqCount = await sql`SELECT COUNT(*)::int AS n FROM equipos`;
+  if (eqCount[0].n === 0) {
+    let cfg = {};
+    try {
+      const rows = await sql`SELECT clave, valor FROM config`;
+      rows.forEach(r => { cfg[r.clave] = r.valor || ''; });
+    } catch {}
+    const hash = await bcrypt.hash('1234', 10);
+    const defId = generateId();
+    const nombre = cfg.nombre || 'Mi Equipo';
+    const slug = slugify(nombre);
+    await sql`
+      INSERT INTO equipos (id, slug, nombre, password_hash, color, logo, liga, planilla_v2)
+      VALUES (${defId}, ${slug}, ${nombre}, ${hash},
+              ${cfg.color || '#16a34a'}, ${cfg.logo || ''},
+              ${cfg.liga || ''}, ${cfg.planilla_v2 || ''})
+    `;
+    await sql`UPDATE campeonatos SET equipo_id = ${defId} WHERE equipo_id IS NULL`;
+    await sql`UPDATE partidos    SET equipo_id = ${defId} WHERE equipo_id IS NULL`;
+    await sql`UPDATE jugadores   SET equipo_id = ${defId} WHERE equipo_id IS NULL`;
+    await sql`UPDATE asistencia  SET equipo_id = ${defId} WHERE equipo_id IS NULL`;
+    console.log(`✓ Equipo por defecto creado: "${nombre}" (slug: ${slug}, pass: 1234)`);
+  }
+
   console.log('✓ Tables ready');
 }
 
@@ -107,7 +169,7 @@ async function seedConfig(ws) {
   console.log(`✓ Config: ${count} rows`);
 }
 
-async function seedCampeonatos(ws) {
+async function seedCampeonatos(ws, equipoId) {
   const rows = sheetToObjects(ws);
   let count = 0;
   for (const row of rows) {
@@ -118,8 +180,8 @@ async function seedCampeonatos(ws) {
     const temporada = norm(row['Temporada'] || row['temporada'] || '');
     const tipo = norm(row['Tipo'] || row['tipo'] || 'Liga') || 'Liga';
     await sql`
-      INSERT INTO campeonatos (id, nombre, ano, temporada, tipo)
-      VALUES (${id}, ${nombre}, ${ano}, ${temporada}, ${tipo})
+      INSERT INTO campeonatos (id, nombre, ano, temporada, tipo, equipo_id)
+      VALUES (${id}, ${nombre}, ${ano}, ${temporada}, ${tipo}, ${equipoId})
       ON CONFLICT (id) DO UPDATE SET
         nombre=EXCLUDED.nombre, ano=EXCLUDED.ano,
         temporada=EXCLUDED.temporada, tipo=EXCLUDED.tipo
@@ -129,7 +191,7 @@ async function seedCampeonatos(ws) {
   console.log(`✓ Campeonatos: ${count} rows`);
 }
 
-async function seedPartidos(ws) {
+async function seedPartidos(ws, equipoId) {
   const rows = sheetToObjects(ws);
   let count = 0;
   for (const row of rows) {
@@ -147,8 +209,8 @@ async function seedPartidos(ws) {
     const amistoso = normBool(row['Amistoso'] || row['amistoso'] || false)
       || ronda.toLowerCase() === 'ami';
     await sql`
-      INSERT INTO partidos (id, id_campeonato, fecha, rival, cancha, ronda, gf, gc, notas, amistoso)
-      VALUES (${id}, ${idCamp}, ${fecha}, ${rival}, ${cancha}, ${ronda}, ${gf}, ${gc}, ${notas}, ${amistoso})
+      INSERT INTO partidos (id, id_campeonato, fecha, rival, cancha, ronda, gf, gc, notas, amistoso, equipo_id)
+      VALUES (${id}, ${idCamp}, ${fecha}, ${rival}, ${cancha}, ${ronda}, ${gf}, ${gc}, ${notas}, ${amistoso}, ${equipoId})
       ON CONFLICT (id) DO UPDATE SET
         id_campeonato=EXCLUDED.id_campeonato, fecha=EXCLUDED.fecha,
         rival=EXCLUDED.rival, cancha=EXCLUDED.cancha, ronda=EXCLUDED.ronda,
@@ -159,7 +221,7 @@ async function seedPartidos(ws) {
   console.log(`✓ Partidos: ${count} rows`);
 }
 
-async function seedJugadores(ws) {
+async function seedJugadores(ws, equipoId) {
   const rows = sheetToObjects(ws);
   let count = 0;
   for (const row of rows) {
@@ -170,8 +232,8 @@ async function seedJugadores(ws) {
     const posicion = norm(row['Posición'] || row['Posicion'] || row['posicion'] || row['Posición'] || '');
     const activo = normBool(row['Activo'] ?? row['activo'] ?? true);
     await sql`
-      INSERT INTO jugadores (id, nombre, dorsal, posicion, activo)
-      VALUES (${id}, ${nombre}, ${dorsal}, ${posicion}, ${activo})
+      INSERT INTO jugadores (id, nombre, dorsal, posicion, activo, equipo_id)
+      VALUES (${id}, ${nombre}, ${dorsal}, ${posicion}, ${activo}, ${equipoId})
       ON CONFLICT (id) DO UPDATE SET
         nombre=EXCLUDED.nombre, dorsal=EXCLUDED.dorsal,
         posicion=EXCLUDED.posicion, activo=EXCLUDED.activo
@@ -181,7 +243,7 @@ async function seedJugadores(ws) {
   console.log(`✓ Jugadores: ${count} rows`);
 }
 
-async function seedAsistencia(ws) {
+async function seedAsistencia(ws, equipoId) {
   const rows = sheetToObjects(ws);
   let count = 0;
   for (const row of rows) {
@@ -195,8 +257,8 @@ async function seedAsistencia(ws) {
     const amarillas = normInt(row['Amarillas'] || row['amarillas'] || 0);
     const rojas = normInt(row['Rojas'] || row['rojas'] || 0);
     await sql`
-      INSERT INTO asistencia (id_partido, id_jugador, nombre_jugador, presente, goles, asistencias, amarillas, rojas)
-      VALUES (${idPartido}, ${idJugador}, ${nombreJugador}, ${presente}, ${goles}, ${asistencias}, ${amarillas}, ${rojas})
+      INSERT INTO asistencia (id_partido, id_jugador, nombre_jugador, presente, goles, asistencias, amarillas, rojas, equipo_id)
+      VALUES (${idPartido}, ${idJugador}, ${nombreJugador}, ${presente}, ${goles}, ${asistencias}, ${amarillas}, ${rojas}, ${equipoId})
       ON CONFLICT (id_partido, id_jugador) DO UPDATE SET
         nombre_jugador=EXCLUDED.nombre_jugador, presente=EXCLUDED.presente,
         goles=EXCLUDED.goles, asistencias=EXCLUDED.asistencias,
@@ -224,6 +286,14 @@ export async function main() {
     return;
   }
 
+  // Obtener el equipo por defecto para asignar los datos importados
+  const eqRows = await sql`SELECT id FROM equipos LIMIT 1`;
+  if (!eqRows.length) {
+    console.warn('⚠️  No hay equipo en la DB. Abortando import.');
+    return;
+  }
+  const defaultEquipoId = eqRows[0].id;
+
   console.log('Reading Excel file:', XLSX_PATH);
   let wb;
   try {
@@ -248,16 +318,16 @@ export async function main() {
   if (wsConfig) await seedConfig(wsConfig);
 
   const wsCamp = findSheet(['Campeonatos', 'campeonatos']);
-  if (wsCamp) await seedCampeonatos(wsCamp);
+  if (wsCamp) await seedCampeonatos(wsCamp, defaultEquipoId);
 
   const wsPartidos = findSheet(['Partidos', 'partidos']);
-  if (wsPartidos) await seedPartidos(wsPartidos);
+  if (wsPartidos) await seedPartidos(wsPartidos, defaultEquipoId);
 
   const wsJugadores = findSheet(['Jugadores', 'jugadores']);
-  if (wsJugadores) await seedJugadores(wsJugadores);
+  if (wsJugadores) await seedJugadores(wsJugadores, defaultEquipoId);
 
   const wsAsist = findSheet(['Asistencia', 'asistencia']);
-  if (wsAsist) await seedAsistencia(wsAsist);
+  if (wsAsist) await seedAsistencia(wsAsist, defaultEquipoId);
 
   console.log('\n✅  Seed complete!');
 }

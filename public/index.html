@@ -389,6 +389,19 @@ button{cursor:pointer}
 }
 
 
+/* ── Team Selector ───────────────────────────── */
+#teamSelectorScreen{display:none;position:fixed;inset:0;z-index:3000;background:var(--bg);overflow-y:auto}
+.team-sel-wrap{max-width:480px;margin:0 auto;padding:40px 16px 60px}
+.team-sel-logo{font-family:'Bebas Neue',cursive;font-size:44px;letter-spacing:2px;color:var(--accent);line-height:1;text-align:center}
+.team-sel-sub{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);text-align:center;margin-top:4px;margin-bottom:32px}
+.team-card-btn{display:flex;align-items:center;gap:14px;background:#fff;border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;text-align:left;width:100%;transition:border-color .18s,box-shadow .18s;box-shadow:var(--shadow)}
+.team-card-btn:hover{box-shadow:var(--shadow-md)}
+.team-card-ico{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-family:'Bebas Neue',cursive;font-size:22px;overflow:hidden}
+.team-card-ico img{width:100%;height:100%;object-fit:contain}
+.team-card-name{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text)}
+.team-card-slug{font-size:11px;color:var(--muted);margin-top:1px}
+.team-card-arrow{margin-left:auto;font-size:20px;color:var(--light)}
+
 /* ── Boot splash ─────────────────────────────── */
 .boot-splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:2000;transition:opacity .25s ease, visibility .25s ease}
 .boot-splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
@@ -1118,13 +1131,65 @@ button{cursor:pointer}
     <button class="btn btn-secondary btn-block" onclick="closeModal('modalRole')">Cerrar</button>
   </div>
 </div>
-``
+
+<!-- ══ SELECTOR DE EQUIPO ════════════════════════════ -->
+<div id="teamSelectorScreen">
+  <div class="team-sel-wrap">
+    <div class="team-sel-logo">Fútbol Manager</div>
+    <div class="team-sel-sub">Seleccioná tu equipo</div>
+
+    <div id="teamSelectorList" style="display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;padding:24px;color:var(--muted);font-size:13px">Cargando equipos…</div>
+    </div>
+
+    <div style="margin-top:20px">
+      <button class="btn btn-outline btn-block" onclick="showCrearEquipoModal()" style="font-size:14px">
+        + Crear equipo nuevo
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CREAR EQUIPO ═══════════════════════════ -->
+<div class="modal-overlay" id="modalCrearEquipo">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Crear equipo</div>
+
+    <div class="form-group">
+      <label class="form-label">Nombre del equipo</label>
+      <input class="form-input" id="newEqNombre" placeholder="Ej: Los Pumas FC" oninput="autoSlugEquipo()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">URL del equipo</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap">?t=</span>
+        <input class="form-input" id="newEqSlug" placeholder="los-pumas-fc" style="flex:1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Clave de edición</label>
+      <input class="form-input" type="password" id="newEqPass" placeholder="Clave para editar datos">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar clave</label>
+      <input class="form-input" type="password" id="newEqPass2" placeholder="Repetir clave"
+             onkeydown="if(event.key==='Enter') submitCrearEquipo()">
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modalCrearEquipo')">Cancelar</button>
+      <button class="btn btn-primary" style="flex:2" onclick="submitCrearEquipo()">Crear equipo</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════
 let STATE = {
+  equipo: null,          // { id, slug, nombre, color, logo, liga, modalidad, jugadores_por_lado }
   configLoaded: false,
   page: 'inicio',
   partidos: [],
@@ -1215,17 +1280,37 @@ function chooseVisitor() {
   toast('Entraste como visita (solo lectura)');
 }
 
-// Elegir usuario
+// Elegir usuario — valida la clave contra el backend (bcrypt)
 function chooseUser() {
   const pass = (document.getElementById('rolePass').value || '').trim();
-  if (pass === '1234') {
-    localStorage.setItem(ROLE_KEY, 'usuario');
-    applyRole('usuario');
-    closeModal('modalRole');
-    toast('Bienvenido, modo usuario');
-  } else {
-    toast('Clave incorrecta', true);
-  }
+  if (!pass) { toast('Ingresá la clave', true); return; }
+  if (!STATE.equipo) { toast('No hay equipo seleccionado', true); return; }
+
+  const btn = document.querySelector('#modalRole .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'checkEditKey', payload: { slug: STATE.equipo.slug, password: pass } })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Entrar como usuario'; }
+    if (r && r.ok) {
+      localStorage.setItem(ROLE_KEY, 'usuario');
+      applyRole('usuario');
+      closeModal('modalRole');
+      toast('Bienvenido, modo usuario ✓');
+    } else {
+      toast('Clave incorrecta', true);
+      document.getElementById('rolePass').value = '';
+    }
+  })
+  .catch(() => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Entrar como usuario'; }
+    toast('Error de conexión', true);
+  });
 }
 
 // Guard para bloquear acciones de edición
@@ -1238,13 +1323,23 @@ function ensureAdmin() {
 }
 
 // ══════════════════════════════════════════════════
-//  GOOGLE APPS SCRIPT BRIDGE
+//  API BRIDGE — inyecta equipoId en cada llamada
 // ══════════════════════════════════════════════════
 function call(action, payload, onSuccess, onError) {
+  const eqId = STATE.equipo?.id;
+  let p;
+  if (payload === null || payload === undefined) {
+    p = eqId ? { equipoId: eqId } : null;
+  } else if (typeof payload !== 'object' || Array.isArray(payload)) {
+    // payload primitivo (string ID) → envuelto en { value, equipoId }
+    p = { value: payload, equipoId: eqId };
+  } else {
+    p = eqId ? { ...payload, equipoId: eqId } : payload;
+  }
   fetch('/api/dispatch', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action, payload})
+    body: JSON.stringify({action, payload: p})
   })
   .then(r => r.json())
   .then(r => { if(onSuccess) onSuccess(r); })
@@ -3499,60 +3594,62 @@ function hideBootSplash() {
 // ══════════════════════════════════════════════════
 //  INIT (Opción A: recuerda elección en localStorage)
 // ══════════════════════════════════════════════════
-window.addEventListener('load', () => {
-  showRoleGate(false);
+window.addEventListener('load', async () => {
   updateBootSplash();
 
-  const finishInit = () => {
-    loadBootstrap(true, () => {
-      loadConfig();
-      loadStats(true);
-      loadJugadores(true);
-      loadCampeonatos(true);
-      renderRivales();
-      hideBootSplash();
-    });
+  // ── Leer el equipo desde la URL (?t=slug) ──
+  const urlParams = new URLSearchParams(window.location.search);
+  const teamSlug  = urlParams.get('t');
+
+  if (!teamSlug) {
+    // Sin slug: mostrar selector de equipo
+    showTeamSelector();
+    return;
+  }
+
+  // Cargar datos del equipo por slug
+  let equipo = null;
+  try {
+    const r = await fetch('/api/dispatch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action: 'getEquipo', payload: teamSlug })
+    }).then(res => res.json());
+    if (r && r.ok && r.equipo) equipo = r.equipo;
+  } catch {}
+
+  if (!equipo) {
+    showTeamSelector();
+    return;
+  }
+
+  // Equipo encontrado: iniciar app
+  STATE.equipo = equipo;
+  document.title = equipo.nombre + ' – Fútbol Manager';
+
+  // Config rápida desde los datos del equipo (sin llamada extra)
+  STATE.configLoaded = true;
+  STATE.config = {
+    nombre: equipo.nombre || 'Mi Equipo',
+    liga:   equipo.liga   || '',
+    logo:   equipo.logo   || '',
+    color:  equipo.color  || '#16a34a'
   };
+  applyThemeColor(STATE.config.color);
+  updateHeader();
+  updateBootSplash();
 
-  call('checkAdmin', null, r => {
-    const saved = localStorage.getItem(ROLE_KEY);
-    if (!saved) applyRole((r && r.isAdmin) ? 'usuario' : 'visita');
+  // Aplicar rol guardado (o mostrar modal)
+  showRoleGate(false);
 
-    // Primero traer Config para mostrar logo + nombre en la pantalla de carga
-    call('getConfig', null, cfg => {
-      if (cfg && cfg.ok && cfg.config) {
-        STATE.configLoaded = true;
-        STATE.config = {
-          nombre: cfg.config.nombre || 'Mi Equipo',
-          liga: cfg.config.liga || '',
-          logo: cfg.config.logo || '',
-          color: cfg.config.color || '#16a34a'
-        };
-        applyThemeColor(STATE.config.color);
-        updateHeader();
-        updateBootSplash();
-      }
-      finishInit();
-    }, finishInit);
-  }, () => {
-    const saved = localStorage.getItem(ROLE_KEY);
-    if (!saved) applyRole('visita');
-
-    // Primero traer Config para mostrar logo + nombre en la pantalla de carga
-    call('getConfig', null, cfg => {
-      if (cfg && cfg.ok && cfg.config) {
-        STATE.config = {
-          nombre: cfg.config.nombre || 'Mi Equipo',
-          liga: cfg.config.liga || '',
-          logo: cfg.config.logo || '',
-          color: cfg.config.color || '#16a34a'
-        };
-        applyThemeColor(STATE.config.color);
-        updateHeader();
-        updateBootSplash();
-      }
-      finishInit();
-    }, finishInit);
+  // Cargar todos los datos
+  loadBootstrap(true, () => {
+    loadConfig();
+    loadStats(true);
+    loadJugadores(true);
+    loadCampeonatos(true);
+    renderRivales();
+    hideBootSplash();
   });
 });
 
@@ -5620,6 +5717,123 @@ function verFormacion() {
   } catch(e) {
     console.error(e);
   }
+}
+</script>
+
+<!-- ══ SELECTOR DE EQUIPO — funciones JS ══════════════════════ -->
+<script>
+// Muestra el selector y carga la lista de equipos
+function showTeamSelector() {
+  document.getElementById('teamSelectorScreen').style.display = '';
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'getEquipos', payload: null })
+  })
+  .then(r => r.json())
+  .then(r => {
+    const list = r.equipos || [];
+    const container = document.getElementById('teamSelectorList');
+
+    if (!list.length) {
+      container.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">No hay equipos todavía. ¡Creá uno primero!</p>';
+      return;
+    }
+
+    // Si hay solo un equipo, redirigir automáticamente
+    if (list.length === 1) {
+      selectEquipo(list[0].slug);
+      return;
+    }
+
+    container.innerHTML = list.map(eq => {
+      const initials = eq.nombre.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'EQ';
+      const logoHtml = eq.logo
+        ? `<img src="${eq.logo}" alt="">`
+        : initials;
+      return `
+        <button class="team-card-btn" onclick="selectEquipo('${eq.slug}')"
+                style="border-color:var(--border)"
+                onmouseover="this.style.borderColor='${eq.color||'#16a34a'}';this.style.boxShadow='0 4px 16px ${eq.color||'#16a34a'}33'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow='var(--shadow)'">
+          <div class="team-card-ico" style="background:${eq.color||'#16a34a'}">${logoHtml}</div>
+          <div>
+            <div class="team-card-name">${eq.nombre}</div>
+            <div class="team-card-slug">?t=${eq.slug}</div>
+          </div>
+          <div class="team-card-arrow">›</div>
+        </button>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('teamSelectorList').innerHTML =
+      '<p style="text-align:center;color:var(--red);font-size:13px;padding:20px 0">Error al cargar equipos. Revisá la conexión.</p>';
+  });
+}
+
+// Navegar a un equipo por slug
+function selectEquipo(slug) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('t', slug);
+  window.location.href = url.toString();
+}
+
+// Mostrar modal para crear equipo
+function showCrearEquipoModal() {
+  ['newEqNombre','newEqSlug','newEqPass','newEqPass2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  openModal('modalCrearEquipo');
+}
+
+// Auto-generar slug desde el nombre
+function autoSlugEquipo() {
+  const nombre = document.getElementById('newEqNombre').value || '';
+  const slug = nombre.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 40);
+  document.getElementById('newEqSlug').value = slug;
+}
+
+// Crear equipo nuevo
+function submitCrearEquipo() {
+  const nombre = (document.getElementById('newEqNombre').value || '').trim();
+  const slug   = (document.getElementById('newEqSlug').value   || '').trim();
+  const pass   = document.getElementById('newEqPass').value  || '';
+  const pass2  = document.getElementById('newEqPass2').value || '';
+
+  if (!nombre) { toast('Ingresá un nombre para el equipo', true); return; }
+  if (!slug)   { toast('El slug no puede estar vacío', true); return; }
+  if (!pass)   { toast('Ingresá una clave de edición', true); return; }
+  if (pass !== pass2) { toast('Las claves no coinciden', true); return; }
+
+  const btn = document.querySelector('#modalCrearEquipo .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'crearEquipo', payload: { nombre, slug, password: pass } })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear equipo'; }
+    if (r && r.ok) {
+      closeModal('modalCrearEquipo');
+      toast('Equipo creado ✓');
+      selectEquipo(r.slug);
+    } else {
+      toast(r.error || 'Error al crear el equipo', true);
+    }
+  })
+  .catch(e => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear equipo'; }
+    toast('Error de conexión', true);
+  });
 }
 </script>
 
