@@ -340,6 +340,11 @@ button{cursor:pointer}
 .color-opt.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--text)}
 .color-opt.selected::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
+/* ── Modalidad toggle ─────────────────────────── */
+.modalidad-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden}
+.modalidad-btn{flex:1;padding:10px;font-size:13px;font-weight:700;border:none;background:var(--bg);color:var(--muted);cursor:pointer;transition:all .2s}
+.modalidad-btn.active{background:var(--accent);color:#fff}
+
 /* ── Rival card ────────────────────────────────── */
 .rival-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);cursor:pointer;transition:all .15s}
 .rival-card:active{transform:scale(.98)}
@@ -526,6 +531,118 @@ button{cursor:pointer}
 .btn-icon:hover,.btn-icon.active{
   background:#fff;
   color:var(--accent);
+}
+
+/* ══════════════════════════════════════════════════
+   FASE 4 – Desktop responsive (≥ 960 px)
+   ══════════════════════════════════════════════════ */
+@media (min-width:960px) {
+  /* Full-width app, grid layout */
+  #app {
+    max-width: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 72px 1fr;
+    grid-template-areas:
+      "header header"
+      "nav    pages";
+  }
+
+  /* Header spans both columns */
+  .header {
+    grid-area: header;
+    padding: 14px 24px 10px;
+  }
+
+  /* Sidebar nav */
+  .nav {
+    grid-area: nav;
+    flex-direction: column;
+    border-top: none;
+    border-right: 1px solid rgba(255,255,255,.15);
+    box-shadow: 2px 0 10px rgba(0,0,0,.08);
+    overflow-y: auto;
+    padding-top: 8px;
+  }
+  .nav-item {
+    padding: 12px 0;
+    font-size: 8px;
+  }
+  .nav-item.active::after {
+    /* switch indicator to left edge */
+    top: 10%; bottom: 10%; left: 0; right: auto;
+    width: 3px; height: auto;
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* Pages fill remaining space */
+  .pages {
+    grid-area: pages;
+    overflow: hidden;
+  }
+
+  /* Pages wider with more padding */
+  .page {
+    padding: 24px 32px;
+  }
+
+  /* Content capped at readable width, centred */
+  .page > * { max-width: 900px; }
+
+  /* Stats grid — 6 columns on desktop */
+  .stats-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  /* Match list — 2-column grid */
+  #listPartidos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+  #listPartidos .match-card { margin-bottom: 0; }
+  /* Loader / empty state spans both cols */
+  #listPartidos .loader,
+  #listPartidos .empty-state { grid-column: 1 / -1; }
+
+  /* Players list — 2-column grid */
+  #listJugadores {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+  #listJugadores .player-card { margin-bottom: 0; }
+  #listJugadores .loader,
+  #listJugadores .empty-state { grid-column: 1 / -1; }
+
+  /* FAB repositioned */
+  .fab {
+    bottom: 24px;
+    right: 32px;
+  }
+
+  /* Modals centred, not bottom-sheet */
+  .modal-overlay {
+    align-items: center;
+  }
+  .modal {
+    border-radius: 16px;
+    max-width: 560px;
+    margin: 0 auto;
+    transform: scale(.95);
+    transition: transform .25s cubic-bezier(.4,0,.2,1), opacity .25s;
+  }
+  .modal-overlay.open .modal {
+    transform: scale(1);
+  }
+
+  /* Section titles bigger */
+  .section-title { font-size: 28px; }
+
+  /* Planilla — wider pitch */
+  #pl2Pitch { max-width: 480px; margin: 0 auto; }
 }
 
 </style>
@@ -722,6 +839,14 @@ button{cursor:pointer}
               <button class="color-opt" style="background:#1e293b" data-color="#1e293b" onclick="pickColor(this)" title="Negro"></button>
               <button class="color-opt" style="background:#ca8a04" data-color="#ca8a04" onclick="pickColor(this)" title="Dorado"></button>
             </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Modalidad de juego</label>
+            <div class="modalidad-toggle" id="modalidadToggle">
+              <button class="modalidad-btn active" id="btnF11" onclick="setModalidad('11')">⚽ Fútbol 11</button>
+              <button class="modalidad-btn" id="btnF7" onclick="setModalidad('7')">🔵 Fútbol 7</button>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:6px">Define la formación disponible en la planilla.</p>
           </div>
           <button class="btn btn-primary btn-block" onclick="guardarConfig()">Guardar en la nube</button>
           <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">
@@ -1362,7 +1487,9 @@ function loadBootstrap(force, done) {
         nombre: r.config?.nombre || '',
         liga: r.config?.liga || '',
         logo: r.config?.logo || '',
-        color: r.config?.color || '#16a34a'
+        color: r.config?.color || '#16a34a',
+        modalidad: r.config?.modalidad || '11',
+        jugadores_por_lado: r.config?.jugadores_por_lado || 11
       };
       STATE.campeonatos = r.campeonatos || [];
       STATE.partidos = r.partidos || [];
@@ -1375,6 +1502,7 @@ function loadBootstrap(force, done) {
       updateHeader();
       updateBootSplash();
       renderPartidos();
+      try { if(window.updatePlanillaFormations) window.updatePlanillaFormations(STATE.config.modalidad || '11'); } catch(e) {}
     }
     if (done) done(r);
   });
@@ -3393,8 +3521,10 @@ function loadConfig(force) {
     if(cfgLiga) cfgLiga.value = STATE.config.liga;
     updateLogoUI();
     updateColorPicker();
+    updateModalidadToggle(STATE.config.modalidad || '11');
     applyThemeColor(STATE.config.color);
     updateHeader();
+    try { if(window.updatePlanillaFormations) window.updatePlanillaFormations(STATE.config.modalidad || '11'); } catch(e) {}
   };
 
   if (STATE.bootstrapLoaded && !force) {
@@ -3409,7 +3539,9 @@ function loadConfig(force) {
         nombre: r.config.nombre || '',
         liga: r.config.liga || '',
         logo: r.config.logo || '',
-        color: r.config.color || '#16a34a'
+        color: r.config.color || '#16a34a',
+        modalidad: r.config.modalidad || '11',
+        jugadores_por_lado: r.config.jugadores_por_lado || 11
       };
     }
     applyConfigToUI();
@@ -3417,6 +3549,20 @@ function loadConfig(force) {
   }, () => {
     updateHeader();
   });
+}
+
+function setModalidad(m) {
+  STATE.config.modalidad = m;
+  STATE.config.jugadores_por_lado = m === '7' ? 7 : 11;
+  updateModalidadToggle(m);
+}
+
+function updateModalidadToggle(m) {
+  const btnF11 = document.getElementById('btnF11');
+  const btnF7  = document.getElementById('btnF7');
+  if(!btnF11 || !btnF7) return;
+  btnF11.classList.toggle('active', m !== '7');
+  btnF7.classList.toggle('active', m === '7');
 }
 
 function guardarConfig() {
@@ -3428,17 +3574,21 @@ function guardarConfig() {
   call('guardarConfig', {
     nombre: STATE.config.nombre,
     liga: STATE.config.liga,
-    color: STATE.config.color || '#16a34a'
+    color: STATE.config.color || '#16a34a',
+    modalidad: STATE.config.modalidad || '11'
   }, r => {
     if(r && r.ok) {
       // Actualizar también el objeto equipo en STATE
       if (STATE.equipo) {
-        STATE.equipo.nombre = STATE.config.nombre;
-        STATE.equipo.liga   = STATE.config.liga;
-        STATE.equipo.color  = STATE.config.color;
+        STATE.equipo.nombre    = STATE.config.nombre;
+        STATE.equipo.liga      = STATE.config.liga;
+        STATE.equipo.color     = STATE.config.color;
+        STATE.equipo.modalidad = STATE.config.modalidad || '11';
+        STATE.equipo.jugadores_por_lado = STATE.config.modalidad === '7' ? 7 : 11;
       }
       document.title = STATE.config.nombre + ' – Fútbol Manager';
       updateHeader();
+      try { if(window.updatePlanillaFormations) window.updatePlanillaFormations(STATE.config.modalidad || '11'); } catch(e) {}
       toast('Configuración guardada ✓');
     } else {
       toast('Error al guardar', true);
@@ -4757,7 +4907,8 @@ function descargarGoleadoresPNG() {
   var SAVE_DEBOUNCE=800;
   var HTML2CANVAS_CDN='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
 
-  var FORMATIONS={
+  // Fútbol 7 formations (6 outfield spots)
+  var FORMATIONS_F7={
     '231':[
       {x:25,y:72,pos:'DEF'},{x:75,y:72,pos:'DEF'},
       {x:18,y:47,pos:'MID'},{x:50,y:52,pos:'MID'},{x:82,y:47,pos:'MID'},
@@ -4768,12 +4919,55 @@ function descargarGoleadoresPNG() {
       {x:35,y:45,pos:'MID'},{x:65,y:45,pos:'MID'},
       {x:50,y:18,pos:'FWD'}
     ],
+    '312':[
+      {x:18,y:72,pos:'DEF'},{x:50,y:76,pos:'DEF'},{x:82,y:72,pos:'DEF'},
+      {x:50,y:45,pos:'MID'},
+      {x:32,y:18,pos:'FWD'},{x:68,y:18,pos:'FWD'}
+    ],
     '222':[
       {x:32,y:72,pos:'DEF'},{x:68,y:72,pos:'DEF'},
       {x:32,y:45,pos:'MID'},{x:68,y:45,pos:'MID'},
       {x:32,y:18,pos:'FWD'},{x:68,y:18,pos:'FWD'}
     ]
   };
+
+  // Fútbol 11 formations (10 outfield spots)
+  var FORMATIONS_F11={
+    '433':[
+      {x:20,y:76,pos:'DEF'},{x:40,y:80,pos:'DEF'},{x:60,y:80,pos:'DEF'},{x:80,y:76,pos:'DEF'},
+      {x:25,y:50,pos:'MID'},{x:50,y:46,pos:'MID'},{x:75,y:50,pos:'MID'},
+      {x:20,y:20,pos:'FWD'},{x:50,y:16,pos:'FWD'},{x:80,y:20,pos:'FWD'}
+    ],
+    '442':[
+      {x:20,y:76,pos:'DEF'},{x:40,y:80,pos:'DEF'},{x:60,y:80,pos:'DEF'},{x:80,y:76,pos:'DEF'},
+      {x:18,y:50,pos:'MID'},{x:38,y:46,pos:'MID'},{x:62,y:46,pos:'MID'},{x:82,y:50,pos:'MID'},
+      {x:35,y:18,pos:'FWD'},{x:65,y:18,pos:'FWD'}
+    ],
+    '4231':[
+      {x:20,y:76,pos:'DEF'},{x:40,y:80,pos:'DEF'},{x:60,y:80,pos:'DEF'},{x:80,y:76,pos:'DEF'},
+      {x:30,y:55,pos:'MID'},{x:70,y:55,pos:'MID'},
+      {x:18,y:32,pos:'MID'},{x:50,y:28,pos:'MID'},{x:82,y:32,pos:'MID'},
+      {x:50,y:12,pos:'FWD'}
+    ],
+    '352':[
+      {x:18,y:76,pos:'DEF'},{x:50,y:80,pos:'DEF'},{x:82,y:76,pos:'DEF'},
+      {x:12,y:52,pos:'MID'},{x:30,y:46,pos:'MID'},{x:50,y:42,pos:'MID'},{x:70,y:46,pos:'MID'},{x:88,y:52,pos:'MID'},
+      {x:35,y:18,pos:'FWD'},{x:65,y:18,pos:'FWD'}
+    ],
+    '532':[
+      {x:12,y:76,pos:'DEF'},{x:30,y:80,pos:'DEF'},{x:50,y:82,pos:'DEF'},{x:70,y:80,pos:'DEF'},{x:88,y:76,pos:'DEF'},
+      {x:25,y:50,pos:'MID'},{x:50,y:46,pos:'MID'},{x:75,y:50,pos:'MID'},
+      {x:35,y:18,pos:'FWD'},{x:65,y:18,pos:'FWD'}
+    ],
+    '343':[
+      {x:18,y:76,pos:'DEF'},{x:50,y:80,pos:'DEF'},{x:82,y:76,pos:'DEF'},
+      {x:18,y:50,pos:'MID'},{x:38,y:46,pos:'MID'},{x:62,y:46,pos:'MID'},{x:82,y:50,pos:'MID'},
+      {x:20,y:18,pos:'FWD'},{x:50,y:14,pos:'FWD'},{x:80,y:18,pos:'FWD'}
+    ]
+  };
+
+  // Active formations (start with F7)
+  var FORMATIONS = FORMATIONS_F7;
 
   var GK_X = 50;
   var GK_Y = 92;
@@ -5762,6 +5956,28 @@ function descargarGoleadoresPNG() {
       return typeof prev==='function' ? prev.apply(this,arguments) : undefined;
     };
   }
+
+  // Exposed to outer scope so loadConfig/guardarConfig can call it
+  window.updatePlanillaFormations = function(modalidad) {
+    var isF11 = modalidad === '11';
+    FORMATIONS = isF11 ? FORMATIONS_F11 : FORMATIONS_F7;
+
+    var sel = document.getElementById('pl2Formation');
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="libre">Libre</option>';
+    var opts = isF11
+      ? [['433','4-3-3'],['442','4-4-2'],['4231','4-2-3-1'],['352','3-5-2'],['532','5-3-2'],['343','3-4-3']]
+      : [['231','2-3-1'],['321','3-2-1'],['312','3-1-2'],['222','2-2-2']];
+    opts.forEach(function(o){
+      var opt = document.createElement('option');
+      opt.value = o[0]; opt.textContent = o[1];
+      sel.appendChild(opt);
+    });
+    // Restore selection if still valid, else default to first
+    var keys = opts.map(function(o){return o[0];});
+    sel.value = keys.indexOf(cur) >= 0 ? cur : (opts[0] ? opts[0][0] : 'libre');
+  };
 
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',boot);
