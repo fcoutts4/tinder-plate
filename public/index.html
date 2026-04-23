@@ -4156,12 +4156,14 @@ window.addEventListener('load', async () => {
   const teamSlug = window.location.pathname.replace(/^\/+/, '').split('/')[0] || '';
 
   if (!teamSlug) {
+    hideBootSplash();
     showTeamSelector();
     return;
   }
 
   // Ruta /admin → panel de administración
   if (teamSlug === 'admin') {
+    hideBootSplash();
     showAdminScreen();
     return;
   }
@@ -4179,6 +4181,7 @@ window.addEventListener('load', async () => {
 
   if (!equipo) {
     // Slug no existe: mostrar pantalla "equipo no encontrado"
+    hideBootSplash();
     showEquipoNotFound(teamSlug);
     return;
   }
@@ -5139,6 +5142,7 @@ function descargarGoleadoresPNG() {
       <button id="pl2Export" class="pl2-btn" style="flex:1;min-width:150px;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;font-weight:700;cursor:pointer">Descargar</button>
       <button id="pl2Share" class="pl2-btn" style="flex:1;min-width:150px;padding:12px;border:0;border-radius:10px;background:#25D366;color:#fff;font-weight:700;cursor:pointer">Compartir</button>
       
+      <button id="pl2Copy" class="pl2-btn-outline" style="flex:1;min-width:120px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:#374151;font-weight:700;cursor:pointer">📋 Copiar lista</button>
       <button id="pl2Clear" class="pl2-btn-outline" style="flex:1;min-width:120px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:#dc2626;font-weight:700;cursor:pointer">🗑️ Limpiar</button>
     </div>
 
@@ -6304,7 +6308,7 @@ function descargarGoleadoresPNG() {
         var _out;
         if(typeof prev==='function'){
           _out=prev.call(this,'planilla');
-          init();
+          try { init(); } catch(e) { console.warn('planilla init error:',e); }
         }
         requestAnimationFrame(function(){ if(typeof bootData==='function') bootData(true); });
         return _out;
