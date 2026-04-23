@@ -1512,9 +1512,18 @@ function submitCampeonato() {
     if(r.ok) {
       toast(data.ID ? 'Campeonato actualizado ✓' : 'Campeonato creado ✓');
       closeModal('modalCampeonato');
-      STATE.campeonatosLoaded = false;
-      STATE.bootstrapLoaded = false;
-      loadCampeonatos(true);
+      const updated = { ID: r.id || data.ID, Nombre: data.Nombre, 'Año': data.Año, Temporada: data.Temporada, Tipo: data.Tipo };
+      if (data.ID) {
+        STATE.campeonatos = STATE.campeonatos.map(c => String(c.ID) === String(data.ID) ? updated : c);
+        // Actualizar nombre de campeonato en los partidos que lo referencian
+        STATE.partidos = STATE.partidos.map(p => String(p.ID_Campeonato) === String(data.ID)
+          ? { ...p, Campeonato_Nombre: updated.Nombre, Campeonato_Tipo: updated.Tipo, 'Campeonato_Año': updated['Año'], Campeonato_Temporada: updated.Temporada }
+          : p);
+      } else {
+        updated.ID = r.id;
+        STATE.campeonatos = [updated, ...STATE.campeonatos];
+      }
+      renderCampeonatos();
     } else toast('Error', true);
   });
 }
@@ -1524,9 +1533,13 @@ function eliminarCamp(id) {
   if(!confirm('¿Eliminar este campeonato? Los partidos asociados quedarán sin campeonato.')) return;
   call('eliminarCampeonato', id, () => {
     toast('Campeonato eliminado');
-    STATE.campeonatosLoaded = false;
-    STATE.bootstrapLoaded = false;
-    loadCampeonatos(true);
+    STATE.campeonatos = STATE.campeonatos.filter(c => String(c.ID) !== String(id));
+    // Desvincular los partidos que tenían este campeonato
+    STATE.partidos = STATE.partidos.map(p => String(p.ID_Campeonato) === String(id)
+      ? { ...p, ID_Campeonato: '', Campeonato_Nombre: '', Campeonato_Tipo: '', 'Campeonato_Año': '', Campeonato_Temporada: '' }
+      : p);
+    renderCampeonatos();
+    renderPartidos();
   });
 }
 
@@ -2285,8 +2298,14 @@ function borrarPartidoConfirm() {
   closeModal('modalOpciones');
   call('eliminarPartido', id, () => {
     toast('Partido eliminado');
-    STATE.bootstrapLoaded = false;
-    loadPartidos(true);
+    STATE.partidos = STATE.partidos.filter(p => String(p.ID) !== String(id));
+    STATE.asistencia = STATE.asistencia.filter(a => String(a.ID_Partido) !== String(id));
+    delete STATE.asistResumen[id];
+    STATE.statsCache = {};
+    STATE.statsLoadedOnce = false;
+    renderPartidos();
+    renderRivales();
+    if (STATE.currentCampDetail) showCampDetail(STATE.currentCampDetail);
   });
 }
 
@@ -2377,12 +2396,37 @@ function submitPartido() {
     if(r.ok) {
       toast(data.ID ? 'Partido actualizado ✓' : 'Partido guardado ✓');
       closeModal('modalPartido');
-      STATE.bootstrapLoaded = false;
-      loadBootstrap(true, () => {
-        if(STATE.currentCampDetail && document.getElementById('campDetailView').style.display !== 'none') {
-          showCampDetail(STATE.currentCampDetail);
-        }
-      });
+      // Enriquecer con datos de campeonato del STATE local
+      const camp = STATE.campeonatos.find(c => String(c.ID) === String(data.ID_Campeonato)) || {};
+      const enriched = {
+        ID: r.id || data.ID,
+        ID_Campeonato: data.ID_Campeonato || '',
+        Fecha: data.Fecha || '',
+        Rival: data.Rival || '',
+        Cancha: data.Cancha || '',
+        Ronda: String(data.Ronda || ''),
+        GF: Number(data.GF) || 0,
+        GC: Number(data.GC) || 0,
+        Notas: data.Notas || '',
+        Amistoso: data.Amistoso === true || String(data.Ronda||'').toLowerCase() === 'ami',
+        Campeonato_Nombre: camp.Nombre || '',
+        Campeonato_Tipo: camp.Tipo || '',
+        'Campeonato_Año': camp['Año'] || '',
+        Campeonato_Temporada: camp.Temporada || ''
+      };
+      if (data.ID) {
+        STATE.partidos = STATE.partidos.map(p => String(p.ID) === String(data.ID) ? enriched : p);
+      } else {
+        STATE.partidos = [enriched, ...STATE.partidos];
+      }
+      delete STATE.asistResumen[enriched.ID];
+      STATE.statsCache = {};
+      STATE.statsLoadedOnce = false;
+      renderPartidos();
+      renderRivales();
+      if (STATE.currentCampDetail && document.getElementById('campDetailView').style.display !== 'none') {
+        showCampDetail(STATE.currentCampDetail);
+      }
     } else toast('Error al guardar', true);
   });
 }
@@ -3284,9 +3328,10 @@ function eliminarJugadorConfirm() {
     if(r && r.ok) {
       toast('Jugador eliminado');
       closeModal('modalJugador');
-      STATE.jugadoresLoaded = false;
+      STATE.jugadores = STATE.jugadores.filter(j => String(j.ID) !== String(id));
       STATE.statsCache = {};
-      loadJugadores(true);
+      STATE.statsLoadedOnce = false;
+      renderJugadores();
     } else {
       toast('Error al eliminar', true);
     }
@@ -3317,9 +3362,22 @@ function submitJugador() {
     if(r.ok) {
       toast(data.ID ? 'Jugador actualizado ✓' : 'Jugador agregado ✓');
       closeModal('modalJugador');
-      STATE.jugadoresLoaded = false;
+      const updated = {
+        ID: r.id || data.ID,
+        Nombre: data.Nombre || '',
+        Dorsal: Number(data.Dorsal) || 0,
+        'Posición': data.Posición || data.Posicion || '',
+        Activo: data.Activo !== false && data.Activo !== 'FALSE'
+      };
+      if (data.ID) {
+        STATE.jugadores = STATE.jugadores.map(j => String(j.ID) === String(data.ID) ? updated : j);
+      } else {
+        STATE.jugadores = [...STATE.jugadores, updated];
+      }
+      STATE.jugadores.sort((a, b) => (Number(a.Dorsal) || 99) - (Number(b.Dorsal) || 99));
       STATE.statsCache = {};
-      loadJugadores(true);
+      STATE.statsLoadedOnce = false;
+      renderJugadores();
     } else toast('Error', true);
   });
 }
@@ -3373,7 +3431,13 @@ function guardarConfig() {
     color: STATE.config.color || '#16a34a'
   }, r => {
     if(r && r.ok) {
-      STATE.bootstrapLoaded = false;
+      // Actualizar también el objeto equipo en STATE
+      if (STATE.equipo) {
+        STATE.equipo.nombre = STATE.config.nombre;
+        STATE.equipo.liga   = STATE.config.liga;
+        STATE.equipo.color  = STATE.config.color;
+      }
+      document.title = STATE.config.nombre + ' – Fútbol Manager';
       updateHeader();
       toast('Configuración guardada ✓');
     } else {
@@ -3434,7 +3498,7 @@ function onLogoFileSelected(input) {
     call('uploadLogo', {dataUrl: evt.target.result, name: file.name}, function(r) {
       if(r && r.ok && r.logoUrl) {
         STATE.config.logo = r.logoUrl;
-        STATE.bootstrapLoaded = false;
+        if (STATE.equipo) STATE.equipo.logo = r.logoUrl;
         updateLogoUI();
         updateHeader();
         toast('Logo guardado ✓');
@@ -3456,7 +3520,7 @@ function removeLogo() {
   call('removeLogo', null, r => {
     if(r && r.ok) {
       STATE.config.logo = '';
-      STATE.bootstrapLoaded = false;
+      if (STATE.equipo) STATE.equipo.logo = '';
       updateLogoUI();
       updateHeader();
       toast('Logo eliminado ✓');
