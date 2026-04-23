@@ -340,6 +340,26 @@ button{cursor:pointer}
 .color-opt.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--text)}
 .color-opt.selected::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
+/* ── Admin screen ────────────────────────────── */
+#adminScreen{display:none;position:fixed;inset:0;z-index:4000;background:var(--bg);overflow-y:auto}
+.admin-wrap{max-width:600px;margin:0 auto;padding:32px 16px 80px}
+.admin-header{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.admin-header-icon{font-size:36px}
+.admin-header-title{font-family:'Bebas Neue',cursive;font-size:36px;letter-spacing:1px;line-height:1;color:var(--text)}
+.admin-header-sub{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.admin-login-box{background:#fff;border:1px solid var(--border);border-radius:16px;padding:32px 24px;max-width:360px;margin:80px auto 0;text-align:center;box-shadow:var(--shadow-md)}
+.admin-login-icon{font-size:48px;margin-bottom:12px}
+.admin-login-title{font-family:'Bebas Neue',cursive;font-size:28px;letter-spacing:1px;margin-bottom:6px}
+.admin-login-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.admin-team-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+.admin-team-row:last-child{border-bottom:none}
+.admin-team-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.admin-team-info{flex:1;min-width:0}
+.admin-team-name{font-weight:700;font-size:15px;color:var(--text)}
+.admin-team-slug{font-size:11px;color:var(--muted);margin-top:1px}
+.admin-team-actions{display:flex;gap:6px;flex-shrink:0}
+.admin-badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:20px;background:var(--accent-bg);color:var(--accent)}
+
 /* ── Stats avanzados ──────────────────────────── */
 .forma-wrap{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .forma-sq{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
@@ -1304,6 +1324,92 @@ button{cursor:pointer}
   </div>
 </div>
 
+<!-- ══ ADMIN SCREEN ════════════════════════════════ -->
+<div id="adminScreen">
+  <!-- LOGIN -->
+  <div id="adminLoginSection">
+    <div class="admin-login-box">
+      <div class="admin-login-icon">🔑</div>
+      <div class="admin-login-title">Panel de administración</div>
+      <div class="admin-login-sub">Solo el administrador puede acceder a esta sección.</div>
+      <div class="form-group" style="text-align:left">
+        <label class="form-label">Clave de administrador</label>
+        <input class="form-input" type="password" id="adminKeyInput" placeholder="Admin key"
+               onkeydown="if(event.key==='Enter') adminLogin()">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="adminLogin()">Ingresar al panel</button>
+      <div style="margin-top:16px">
+        <a href="/" style="font-size:12px;color:var(--muted);text-decoration:none">← Volver al selector</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD (se muestra tras login correcto) -->
+  <div id="adminDashboard" style="display:none">
+    <div class="admin-wrap">
+      <!-- Header -->
+      <div class="admin-header">
+        <div class="admin-header-icon">⚙️</div>
+        <div>
+          <div class="admin-header-title">Panel de administración</div>
+          <div class="admin-header-sub">Fútbol Manager</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <a href="/" style="font-size:12px;color:var(--muted);text-decoration:none">← Selector</a>
+          <button onclick="adminLogout()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--muted)">Salir</button>
+        </div>
+      </div>
+
+      <!-- Crear nuevo equipo -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">➕ Crear nuevo equipo</div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nombre del equipo</label>
+              <input class="form-input" id="adNombre" placeholder="Ej: Los Pumas FC" oninput="adAutoSlug()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug (URL)</label>
+              <input class="form-input" id="adSlug" placeholder="los-pumas-fc">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Clave de edición</label>
+              <input class="form-input" type="password" id="adPass" placeholder="Clave del equipo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirmar clave</label>
+              <input class="form-input" type="password" id="adPass2" placeholder="Repetir clave">
+            </div>
+          </div>
+          <div style="margin-top:4px;display:flex;gap:8px;align-items:center">
+            <div style="flex:1;font-size:12px;color:var(--muted)">
+              URL: <strong id="adSlugPreview" style="color:var(--accent)">—</strong>
+            </div>
+            <button class="btn btn-primary" id="adCrearBtn" onclick="adminCrearEquipo()" style="flex:none">
+              Crear equipo
+            </button>
+          </div>
+          <div id="adError" style="display:none;margin-top:10px;padding:10px;background:#fff1f2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#dc2626"></div>
+        </div>
+      </div>
+
+      <!-- Lista de equipos -->
+      <div class="card">
+        <div class="card-header" style="justify-content:space-between">
+          <span>📋 Equipos registrados</span>
+          <button onclick="adminCargarEquipos()" style="background:none;border:none;font-size:12px;color:var(--accent);cursor:pointer;font-weight:700">↻ Actualizar</button>
+        </div>
+        <div class="card-body" id="adminTeamList">
+          <div class="loader"><div class="spinner"></div>Cargando…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SELECTOR DE EQUIPO ════════════════════════════ -->
 <div id="teamSelectorScreen">
   <div class="team-sel-wrap">
@@ -1320,21 +1426,11 @@ button{cursor:pointer}
       </button>
     </div>
 
-    <!-- Panel admin (colapsado por defecto) -->
-    <div style="margin-top:32px;border-top:1px solid var(--border);padding-top:20px">
-      <div id="adminPanelBtn" style="text-align:center">
-        <button onclick="mostrarPanelAdmin()" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline">
-          🔑 Administrar equipos
-        </button>
-      </div>
-      <div id="adminPanelBox" style="display:none">
-        <div class="form-group">
-          <label class="form-label" style="margin-top:8px">Clave de administrador</label>
-          <input class="form-input" type="password" id="adminPanelKey" placeholder="Admin key">
-        </div>
-        <button class="btn btn-primary btn-block" onclick="cargarPanelAdmin()">Ver panel admin</button>
-        <div id="adminPanelContent" style="margin-top:16px"></div>
-      </div>
+    <!-- Link discreto al panel admin -->
+    <div style="margin-top:32px;border-top:1px solid var(--border);padding-top:16px;text-align:center">
+      <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none">
+        🔑 Panel de administración
+      </a>
     </div>
   </div>
 </div>
@@ -4056,12 +4152,17 @@ function hideBootSplash() {
 window.addEventListener('load', async () => {
   updateBootSplash();
 
-  // ── Leer el equipo desde la ruta (ej: /tinder-plate) ──
+  // ── Leer la ruta ──
   const teamSlug = window.location.pathname.replace(/^\/+/, '').split('/')[0] || '';
 
   if (!teamSlug) {
-    // Raíz /: mostrar selector de equipo
     showTeamSelector();
+    return;
+  }
+
+  // Ruta /admin → panel de administración
+  if (teamSlug === 'admin') {
+    showAdminScreen();
     return;
   }
 
@@ -6379,18 +6480,134 @@ function submitCrearEquipo() {
   });
 }
 
-// ── Panel admin en el selector ──────────────────────────
-function mostrarPanelAdmin() {
-  document.getElementById('adminPanelBtn').style.display = 'none';
-  document.getElementById('adminPanelBox').style.display = '';
+// ══════════════════════════════════════════════════
+//  ADMIN SCREEN  (/admin)
+// ══════════════════════════════════════════════════
+var _adminKey = '';  // en memoria, no persiste entre recargas
+
+function showAdminScreen() {
+  document.getElementById('adminScreen').style.display = '';
+  document.title = 'Admin — Fútbol Manager';
+  // Si hay sesión activa en sessionStorage, auto-login
+  const saved = sessionStorage.getItem('fm_admin_key');
+  if (saved) { _adminKey = saved; _mostrarDashboard(); }
 }
 
-function cargarPanelAdmin() {
-  const adminKey = (document.getElementById('adminPanelKey')?.value || '').trim();
-  if (!adminKey) { alert('Ingresá la clave de administrador'); return; }
+function adminLogin() {
+  const key = (document.getElementById('adminKeyInput')?.value || '').trim();
+  if (!key) { alert('Ingresá la clave de administrador'); return; }
 
-  const content = document.getElementById('adminPanelContent');
-  content.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:13px">Cargando…</p>';
+  const btn = document.querySelector('#adminLoginSection .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'checkAdminKey', payload: { adminKey: key } })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar al panel'; }
+    if (r && r.ok) {
+      _adminKey = key;
+      sessionStorage.setItem('fm_admin_key', key);
+      _mostrarDashboard();
+    } else {
+      alert('Clave de administrador incorrecta');
+      document.getElementById('adminKeyInput').value = '';
+      document.getElementById('adminKeyInput').focus();
+    }
+  })
+  .catch(() => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar al panel'; }
+    alert('Error de conexión');
+  });
+}
+
+function _mostrarDashboard() {
+  document.getElementById('adminLoginSection').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = '';
+  adminCargarEquipos();
+}
+
+function adminLogout() {
+  _adminKey = '';
+  sessionStorage.removeItem('fm_admin_key');
+  document.getElementById('adminLoginSection').style.display = '';
+  document.getElementById('adminDashboard').style.display = 'none';
+  const inp = document.getElementById('adminKeyInput');
+  if (inp) { inp.value = ''; inp.focus(); }
+}
+
+// ── Auto-slug ────────────────────────────────────────────
+function adAutoSlug() {
+  const nombre = document.getElementById('adNombre')?.value || '';
+  const slug = nombre.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 40);
+  const slugEl = document.getElementById('adSlug');
+  const preview = document.getElementById('adSlugPreview');
+  if (slugEl) slugEl.value = slug;
+  if (preview) preview.textContent = slug ? window.location.host + '/' + slug : '—';
+}
+
+// ── Crear equipo ─────────────────────────────────────────
+function adminCrearEquipo() {
+  const nombre = (document.getElementById('adNombre')?.value || '').trim();
+  const slug   = (document.getElementById('adSlug')?.value   || '').trim();
+  const pass   = document.getElementById('adPass')?.value    || '';
+  const pass2  = document.getElementById('adPass2')?.value   || '';
+  const errEl  = document.getElementById('adError');
+
+  const showErr = (msg) => {
+    if (errEl) { errEl.textContent = msg; errEl.style.display = ''; }
+  };
+  if (errEl) errEl.style.display = 'none';
+
+  if (!nombre) { showErr('El nombre es obligatorio'); return; }
+  if (!slug)   { showErr('El slug es obligatorio'); return; }
+  if (!pass)   { showErr('La clave de edición es obligatoria'); return; }
+  if (pass !== pass2) { showErr('Las claves no coinciden'); return; }
+
+  const btn = document.getElementById('adCrearBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+
+  fetch('/api/dispatch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action: 'crearEquipo', payload: { nombre, slug, password: pass, adminKey: _adminKey } })
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear equipo'; }
+    if (r && r.ok) {
+      // Limpiar form
+      ['adNombre','adSlug','adPass','adPass2'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      const preview = document.getElementById('adSlugPreview');
+      if (preview) preview.textContent = '—';
+      if (errEl) errEl.style.display = 'none';
+      // Mostrar éxito y recargar lista
+      _adminToast('✅ Equipo "' + nombre + '" creado. URL: /' + r.slug);
+      adminCargarEquipos();
+    } else {
+      showErr(r?.error || 'Error al crear el equipo');
+    }
+  })
+  .catch(() => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear equipo'; }
+    showErr('Error de conexión');
+  });
+}
+
+// ── Cargar lista de equipos ──────────────────────────────
+function adminCargarEquipos() {
+  const listEl = document.getElementById('adminTeamList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Cargando…</div>';
 
   fetch('/api/dispatch', {
     method: 'POST',
@@ -6399,49 +6616,74 @@ function cargarPanelAdmin() {
   })
   .then(r => r.json())
   .then(r => {
-    if (!r || !r.ok || !r.equipos) {
-      content.innerHTML = '<p style="color:red;font-size:13px">Error al cargar equipos</p>'; return;
+    if (!r?.ok || !Array.isArray(r.equipos)) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-size:13px">Error al cargar equipos.</p>';
+      return;
     }
-    const equipos = r.equipos;
-    if (!equipos.length) {
-      content.innerHTML = '<p style="color:var(--muted);font-size:13px">No hay equipos registrados.</p>'; return;
+    if (!r.equipos.length) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">No hay equipos registrados todavía.</p>';
+      return;
     }
-    content.innerHTML = equipos.map(eq => `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="width:12px;height:12px;border-radius:50%;background:${eq.color||'#16a34a'};flex-shrink:0"></div>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:14px">${eq.nombre}</div>
-          <div style="font-size:11px;color:var(--muted)">/${eq.slug}</div>
+    listEl.innerHTML = r.equipos.map(eq => `
+      <div class="admin-team-row">
+        <div class="admin-team-dot" style="background:${eq.color||'#16a34a'}"></div>
+        <div class="admin-team-info">
+          <div class="admin-team-name">${eq.nombre}</div>
+          <div class="admin-team-slug">/${eq.slug}${eq.liga ? ' · ' + eq.liga : ''}</div>
         </div>
-        <a href="/${eq.slug}" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:700">Ver →</a>
-        <button onclick="adminEliminarEquipo('${eq.id}','${eq.nombre}','${adminKey}')"
-                style="background:none;border:1px solid #dc2626;border-radius:6px;color:#dc2626;font-size:11px;padding:4px 8px;cursor:pointer">
-          Eliminar
-        </button>
+        <div class="admin-team-actions">
+          <a href="/${eq.slug}" target="_blank"
+             style="display:inline-flex;align-items:center;padding:5px 10px;border:1px solid var(--accent);border-radius:6px;font-size:12px;font-weight:700;color:var(--accent);text-decoration:none">
+            Ver →
+          </a>
+          <button onclick="adminEliminarDesAdmin('${eq.id}','${eq.nombre.replace(/'/g,"\\'")}')"
+                  style="display:inline-flex;align-items:center;padding:5px 10px;border:1px solid #dc2626;border-radius:6px;font-size:12px;font-weight:700;color:#dc2626;background:none;cursor:pointer">
+            Eliminar
+          </button>
+        </div>
       </div>
     `).join('');
   })
-  .catch(() => { content.innerHTML = '<p style="color:red;font-size:13px">Error de conexión</p>'; });
+  .catch(() => {
+    listEl.innerHTML = '<p style="color:var(--muted);font-size:13px">Error de conexión.</p>';
+  });
 }
 
-function adminEliminarEquipo(equipoId, nombre, adminKey) {
-  if (!confirm(`¿Eliminar el equipo "${nombre}" y TODOS sus datos? Esta acción es irreversible.`)) return;
+// ── Eliminar equipo desde el admin ───────────────────────
+function adminEliminarDesAdmin(equipoId, nombre) {
+  if (!confirm('¿Eliminar el equipo "' + nombre + '" y TODOS sus datos? Esta acción es irreversible.')) return;
   fetch('/api/dispatch', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ action: 'eliminarEquipo', payload: { equipoId, adminKey } })
+    body: JSON.stringify({ action: 'eliminarEquipo', payload: { equipoId, adminKey: _adminKey } })
   })
   .then(r => r.json())
   .then(r => {
-    if (r && r.ok) {
-      alert(`Equipo "${nombre}" eliminado.`);
-      cargarPanelAdmin(); // refresca la lista
+    if (r?.ok) {
+      _adminToast('🗑️ Equipo "' + nombre + '" eliminado.');
+      adminCargarEquipos();
     } else {
       alert(r?.error || 'Error al eliminar');
     }
   })
   .catch(() => alert('Error de conexión'));
 }
+
+// ── Toast dentro del admin ───────────────────────────────
+function _adminToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, {
+    position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)',
+    background:'#1e293b', color:'#fff', padding:'12px 20px', borderRadius:'10px',
+    fontSize:'14px', fontWeight:'600', zIndex:'9999', whiteSpace:'nowrap',
+    boxShadow:'0 4px 16px rgba(0,0,0,.2)', transition:'opacity .3s'
+  });
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+}
+
+// (panel admin movido a /admin — ver adminScreen JS arriba)
 </script>
 
 </body>
