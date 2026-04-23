@@ -1275,6 +1275,16 @@ button{cursor:pointer}
   </div>
 </div>
 
+<!-- ══ EQUIPO NO ENCONTRADO ══════════════════════════ -->
+<div id="teamNotFoundScreen" style="display:none;position:fixed;inset:0;z-index:3000;background:var(--bg);overflow-y:auto">
+  <div class="team-sel-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center">
+    <div style="font-size:64px;margin-bottom:16px">🏟️</div>
+    <div style="font-family:'Bebas Neue',cursive;font-size:36px;letter-spacing:1px;color:var(--text);margin-bottom:8px">Equipo no encontrado</div>
+    <div id="teamNotFoundSlug" style="font-size:13px;color:var(--muted);margin-bottom:32px"></div>
+    <a href="/" class="btn btn-primary" style="text-decoration:none">← Ver todos los equipos</a>
+  </div>
+</div>
+
 <!-- ══ MODAL CREAR EQUIPO ═══════════════════════════ -->
 <div class="modal-overlay" id="modalCrearEquipo">
   <div class="modal">
@@ -1288,18 +1298,23 @@ button{cursor:pointer}
     <div class="form-group">
       <label class="form-label">URL del equipo</label>
       <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:12px;color:var(--muted);white-space:nowrap">?t=</span>
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600">planilla-equipo.vercel.app/</span>
         <input class="form-input" id="newEqSlug" placeholder="los-pumas-fc" style="flex:1">
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Clave de edición</label>
+      <label class="form-label">Clave de edición del equipo</label>
       <input class="form-input" type="password" id="newEqPass" placeholder="Clave para editar datos">
     </div>
     <div class="form-group">
-      <label class="form-label">Confirmar clave</label>
-      <input class="form-input" type="password" id="newEqPass2" placeholder="Repetir clave"
+      <label class="form-label">Confirmar clave de edición</label>
+      <input class="form-input" type="password" id="newEqPass2" placeholder="Repetir clave">
+    </div>
+    <div class="form-group">
+      <label class="form-label">🔑 Clave de administrador</label>
+      <input class="form-input" type="password" id="newEqAdminKey" placeholder="Solo el admin puede crear equipos"
              onkeydown="if(event.key==='Enter') submitCrearEquipo()">
+      <p style="font-size:11px;color:var(--muted);margin-top:5px">Necesaria para crear nuevos equipos.</p>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -3811,12 +3826,11 @@ function hideBootSplash() {
 window.addEventListener('load', async () => {
   updateBootSplash();
 
-  // ── Leer el equipo desde la URL (?t=slug) ──
-  const urlParams = new URLSearchParams(window.location.search);
-  const teamSlug  = urlParams.get('t');
+  // ── Leer el equipo desde la ruta (ej: /tinder-plate) ──
+  const teamSlug = window.location.pathname.replace(/^\/+/, '').split('/')[0] || '';
 
   if (!teamSlug) {
-    // Sin slug: mostrar selector de equipo
+    // Raíz /: mostrar selector de equipo
     showTeamSelector();
     return;
   }
@@ -3833,7 +3847,8 @@ window.addEventListener('load', async () => {
   } catch {}
 
   if (!equipo) {
-    showTeamSelector();
+    // Slug no existe: mostrar pantalla "equipo no encontrado"
+    showEquipoNotFound(teamSlug);
     return;
   }
 
@@ -3844,14 +3859,17 @@ window.addEventListener('load', async () => {
   // Config rápida desde los datos del equipo (sin llamada extra)
   STATE.configLoaded = true;
   STATE.config = {
-    nombre: equipo.nombre || 'Mi Equipo',
-    liga:   equipo.liga   || '',
-    logo:   equipo.logo   || '',
-    color:  equipo.color  || '#16a34a'
+    nombre:            equipo.nombre            || 'Mi Equipo',
+    liga:              equipo.liga              || '',
+    logo:              equipo.logo              || '',
+    color:             equipo.color             || '#16a34a',
+    modalidad:         equipo.modalidad         || '11',
+    jugadores_por_lado: equipo.jugadores_por_lado || 11
   };
   applyThemeColor(STATE.config.color);
   updateHeader();
   updateBootSplash();
+  try { if(window.updatePlanillaFormations) window.updatePlanillaFormations(STATE.config.modalidad); } catch(e) {}
 
   // Aplicar rol guardado (o mostrar modal)
   showRoleGate(false);
@@ -6052,16 +6070,22 @@ function showTeamSelector() {
   });
 }
 
-// Navegar a un equipo por slug
+// Navegar a un equipo por slug: /slug
 function selectEquipo(slug) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('t', slug);
-  window.location.href = url.toString();
+  window.location.href = '/' + slug;
+}
+
+// Mostrar pantalla "equipo no encontrado"
+function showEquipoNotFound(slug) {
+  const screen = document.getElementById('teamNotFoundScreen');
+  const label  = document.getElementById('teamNotFoundSlug');
+  if (label) label.textContent = 'La ruta "/' + slug + '" no corresponde a ningún equipo registrado.';
+  if (screen) screen.style.display = '';
 }
 
 // Mostrar modal para crear equipo
 function showCrearEquipoModal() {
-  ['newEqNombre','newEqSlug','newEqPass','newEqPass2'].forEach(id => {
+  ['newEqNombre','newEqSlug','newEqPass','newEqPass2','newEqAdminKey'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -6081,15 +6105,17 @@ function autoSlugEquipo() {
 
 // Crear equipo nuevo
 function submitCrearEquipo() {
-  const nombre = (document.getElementById('newEqNombre').value || '').trim();
-  const slug   = (document.getElementById('newEqSlug').value   || '').trim();
-  const pass   = document.getElementById('newEqPass').value  || '';
-  const pass2  = document.getElementById('newEqPass2').value || '';
+  const nombre    = (document.getElementById('newEqNombre').value   || '').trim();
+  const slug      = (document.getElementById('newEqSlug').value     || '').trim();
+  const pass      = document.getElementById('newEqPass').value      || '';
+  const pass2     = document.getElementById('newEqPass2').value     || '';
+  const adminKey  = document.getElementById('newEqAdminKey').value  || '';
 
-  if (!nombre) { toast('Ingresá un nombre para el equipo', true); return; }
-  if (!slug)   { toast('El slug no puede estar vacío', true); return; }
-  if (!pass)   { toast('Ingresá una clave de edición', true); return; }
+  if (!nombre)   { toast('Ingresá un nombre para el equipo', true); return; }
+  if (!slug)     { toast('El slug no puede estar vacío', true); return; }
+  if (!pass)     { toast('Ingresá una clave de edición', true); return; }
   if (pass !== pass2) { toast('Las claves no coinciden', true); return; }
+  if (!adminKey) { toast('Ingresá la clave de administrador', true); return; }
 
   const btn = document.querySelector('#modalCrearEquipo .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
@@ -6097,7 +6123,7 @@ function submitCrearEquipo() {
   fetch('/api/dispatch', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ action: 'crearEquipo', payload: { nombre, slug, password: pass } })
+    body: JSON.stringify({ action: 'crearEquipo', payload: { nombre, slug, password: pass, adminKey } })
   })
   .then(r => r.json())
   .then(r => {
